@@ -2581,7 +2581,7 @@ static mi_response_t *rtp_relay_update_async(struct rtp_async_param *p)
 	struct list_head *it, *safe;
 	struct rtp_relay_tmp *tmp;
 	struct dlg_cell *dlg;
-	int success = 0;
+	int success = 0, skipped = 0, not_owned = 0;
 
 	list_for_each_safe(it, safe, &p->contexts) {
 		tmp = list_entry(it, struct rtp_relay_tmp, list);
@@ -2598,6 +2598,14 @@ static mi_response_t *rtp_relay_update_async(struct rtp_async_param *p)
 		if (dlg->state > 4) {
 			LM_DBG("call in terminate state; skipping!\n");
 			rtp_relay_release_tmp(tmp, 0);
+			skipped++;
+			continue;
+		}
+		if (rtp_relay_dlg_is_backup(dlg)) {
+			LM_DBG("dialog owned by another node; skipping!\n");
+			rtp_relay_release_tmp(tmp, 0);
+			skipped++;
+			not_owned++;
 			continue;
 		}
 		if (rtp_relay_update_reinvites(tmp) < 0) {
@@ -2612,6 +2620,10 @@ static mi_response_t *rtp_relay_update_async(struct rtp_async_param *p)
 			return init_mi_result_string(MI_SSTR("Accepted"));
 		else
 			return MI_ASYNC_RPL;
+	} else if (not_owned && skipped == p->no) {
+		/* nothing left for this node: the rest belongs to another one */
+		shm_free(p);
+		return init_mi_result_ok();
 	} else {
 		shm_free(p);
 		return init_mi_error(400, MI_SSTR("RTP Relay not available"));

@@ -23,6 +23,8 @@
 #include "../../mem/mem.h"
 #include "../../ut.h"
 #include "../../parser/parse_from.h"
+#include "../clusterer/api.h"
+#include "../dialog/dlg_hash.h"
 
 #include "rtp_relay_load.h"
 #include "rtp_relay_ctx.h"
@@ -53,6 +55,19 @@ static int fixup_rtp_relay(void **param);
 static int mod_preinit(void);
 static int mod_init(void);
 
+static int rtp_relay_cluster_id = 0;
+static struct clusterer_binds rtp_relay_clusterer;
+
+int rtp_relay_dlg_is_backup(struct dlg_cell *dlg)
+{
+	if (rtp_relay_cluster_id <= 0 || !dlg || !dlg->shtag.s || dlg->shtag.len == 0)
+		return 0;
+
+	/* -1 is an error: process the dialog rather than strand the call */
+	return rtp_relay_clusterer.shtag_get(&dlg->shtag,
+			rtp_relay_cluster_id) == SHTAG_STATE_BACKUP;
+}
+
 static const dep_export_t mod_deps = {
 	{ /* OpenSIPS module dependencies */
 		{ MOD_TYPE_DEFAULT, "tm", DEP_ABORT },
@@ -61,6 +76,8 @@ static const dep_export_t mod_deps = {
 		{ MOD_TYPE_NULL, NULL, 0 },
 	},
 	{ /* modparam dependencies */
+		{ "cluster_id", get_deps_clusterer },
+		{ NULL, NULL },
 	},
 };
 
@@ -129,6 +146,7 @@ static const param_export_t mod_params[] = {
 	{"route_copy_offer",  STR_PARAM, &rtp_relay_route_copy_offer_name},
 	{"route_copy_answer", STR_PARAM, &rtp_relay_route_copy_answer_name},
 	{"route_copy_delete", STR_PARAM, &rtp_relay_route_copy_delete_name},
+	{"cluster_id",        INT_PARAM, &rtp_relay_cluster_id},
 	{0, 0, 0}
 };
 
@@ -196,6 +214,12 @@ static int mod_init(void)
 {
 	if (rtp_relay_ctx_init() < 0) {
 		LM_ERR("could not initialize rtp_relay ctx\n");
+		return -1;
+	}
+
+	if (rtp_relay_cluster_id > 0 &&
+			load_clusterer_api(&rtp_relay_clusterer) < 0) {
+		LM_ERR("cluster_id is set but the clusterer API is missing\n");
 		return -1;
 	}
 	return 0;

@@ -89,6 +89,11 @@ struct rtp_relay *rtp_relay_get(str *name);
 int rtp_relay_reg(char *name, struct rtp_relay_funcs *funcs,
 		struct rtp_relay_hooks *hooks);
 
+/* Non-zero when this node holds the dialog's sharing tag in backup state, so
+ * that only the owner acts on it. Always 0 unless cluster_id is configured. */
+struct dlg_cell;
+int rtp_relay_dlg_is_backup(struct dlg_cell *dlg);
+
 static inline int register_rtp_relay(const char *name,
 		struct rtp_relay_funcs *funcs, struct rtp_relay_hooks *hooks)
 {
