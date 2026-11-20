@@ -692,6 +692,7 @@ int load_dlg( struct dlg_binds *dlgb )
 	dlgb->get_dlg_did = dlg_get_did;
 	dlgb->get_dlg_by_did = get_dlg_by_did;
 	dlgb->get_dlg_by_ids = get_dlg_by_ids;
+	dlgb->get_shtag_state = get_shtag_state;
 	dlgb->get_dlg_by_callid = get_dlg_by_callid;
 	dlgb->send_indialog_request = send_indialog_request;
 

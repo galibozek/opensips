@@ -23,6 +23,7 @@
 #include "../../mem/shm_mem.h"
 #include "../tm/tm_load.h"
 #include "../dialog/dlg_load.h"
+#include "../clusterer/api.h"
 #include "../../bin_interface.h"
 #include "../../lib/cJSON.h"
 #include "../../data_lump.h"
@@ -2601,7 +2602,8 @@ static mi_response_t *rtp_relay_update_async(struct rtp_async_param *p)
 			skipped++;
 			continue;
 		}
-		if (rtp_relay_dlg_is_backup(dlg)) {
+		/* with dialog replication, only the node owning the call re-INVITEs it */
+		if (rtp_relay_dlg.get_shtag_state(dlg) == SHTAG_STATE_BACKUP) {
 			LM_DBG("dialog owned by another node; skipping!\n");
 			rtp_relay_release_tmp(tmp, 0);
 			skipped++;

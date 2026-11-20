@@ -109,8 +109,6 @@ The following modules must be loaded before this module:
 - *RTP Relay* module(s) - such *rtpproxy*, or
 *rtpengine*, or any module that implements the
 *rtp_relay* interface.
-- *clusterer* module - only if
-[cluster_id](#cluster_id-integer) is set.
 
 
 #### External Libraries or Applications
@@ -461,38 +459,6 @@ route[rtp_relay_copy_delete] {
 ```
 
 
-#### cluster_id (integer)
-
-
-The cluster whose sharing tags say which node owns a dialog. When
-set, and the dialog carries a sharing tag (see
-*set_dlg_sharing_tag()* in the *dialog* module), *rtp_relay:update*
-and *rtp_relay:update_callid* skip the dialogs for which this node is
-in BACKUP state, so that with dialog replication only the node owning
-a call re-INVITEs it. A node left with nothing to update answers OK.
-Dialogs without a sharing tag are processed as before.
-
-
-Set it to the dialog module's *dialog_replication_cluster*. A tag
-this cluster does not know yet is created in BACKUP state, so with any
-other value every tagged dialog is skipped on every node. When the
-owner itself fails, make the tag active on a surviving node
-(*clusterer:shtag_set_active*) before updating its calls.
-
-
-Requires the *clusterer* module when set.
-
-
-*Default value is 0 (disabled).*
-
-
-```opensips title="Set cluster_id parameter"
-...
-modparam("rtp_relay", "cluster_id", 1)
-...
-```
-
-
 ### Exported Functions
 
 
@@ -620,6 +586,14 @@ the updated SDP.
 > (such as *engine* or *set*)
 > will cause all RTP relay sessions to be
 > re-engaged.
+
+
+> [!NOTE]
+> With dialog replication and sharing tags (see
+> *set_dlg_sharing_tag()* in the *dialog* module), this command
+> and *rtp_relay:update_callid* skip the dialogs this node is
+> BACKUP for, so only the node owning a call re-INVITEs it. A
+> node left with nothing to update answers OK.
 
 
 > [!NOTE]
