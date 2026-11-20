@@ -2313,23 +2313,28 @@ static int rtp_relay_release_tmp(struct rtp_relay_tmp *tmp, int success)
 		}
 		RTP_RELAY_CTX_UNLOCK(tmp->ctx);
 	}
-	/* update the async param */
+	/* update the async param; the error paths of mi_rtp_relay_update() and
+	 * mi_rtp_relay_update_callid() release a tmp before it has one */
 	p = tmp->param;
-	lock_get(&p->lock);
-	list_del(&tmp->list);
-	p->completed++;
-	if (success)
-		p->success++;
-	/* if all sessions completed, return the number of completed
-	 * sessions, otherwise return the number of failed sessions */
-	if (p->no == p->completed)
-		if (p->success)
-			ret = p->success;
+	if (p) {
+		lock_get(&p->lock);
+		list_del(&tmp->list);
+		p->completed++;
+		if (success)
+			p->success++;
+		/* if all sessions completed, return the number of completed
+		 * sessions, otherwise return the number of failed sessions */
+		if (p->no == p->completed)
+			if (p->success)
+				ret = p->success;
+			else
+				ret = -p->no;
 		else
-			ret = -p->no;
-	else
+			ret = 0;
+		lock_release(&p->lock);
+	} else {
 		ret = 0;
-	lock_release(&p->lock);
+	}
 
 	/* finally, delete the previous session */
 	if (del_sess) {
@@ -2580,19 +2585,21 @@ static mi_response_t *rtp_relay_update_async(struct rtp_async_param *p)
 
 	list_for_each_safe(it, safe, &p->contexts) {
 		tmp = list_entry(it, struct rtp_relay_tmp, list);
+		/* before any skip: rtp_relay_release_tmp() accounts the tmp on its
+		 * param and drops the reference get_dlg_by_ids() takes */
+		tmp->param = p;
 		dlg = rtp_relay_dlg.get_dlg_by_ids(tmp->ctx->dlg_entry, tmp->ctx->dlg_id, 0);
 		if (!dlg) {
 			LM_BUG("could not find dialog!\n");
 			rtp_relay_release_tmp(tmp, 0);
 			continue;
 		}
+		tmp->dlg = dlg;
 		if (dlg->state > 4) {
 			LM_DBG("call in terminate state; skipping!\n");
 			rtp_relay_release_tmp(tmp, 0);
 			continue;
 		}
-		tmp->param = p;
-		tmp->dlg = dlg;
 		if (rtp_relay_update_reinvites(tmp) < 0) {
 			rtp_relay_release_tmp(tmp, 0);
 			continue;
